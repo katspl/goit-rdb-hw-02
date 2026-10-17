@@ -1,0 +1,68 @@
+// Домен: IBM Telco Customer Churn (референс). 
+Table hw2_customers {
+  customer_id bigint [pk]
+  gender varchar(10) [not null, note: "CHECK IN ('Female','Male')"]
+  senior_citizen boolean [not null]
+  has_partner boolean [not null]
+  has_dependents boolean [not null]
+  Note: 'Бізнес. Telco: customerID, gender, SeniorCitizen, Partner, Dependents'
+}
+
+Table hw2_services {
+  service_id integer [pk]
+  service_name varchar(50) [not null, unique]
+  service_group varchar(20) [not null, note: "phone / internet / addon"]
+  Note: 'Бізнес. Довідник послуг'
+}
+
+Table hw2_customer_services {
+  customer_id bigint [pk, not null]
+  service_id integer [pk, not null]
+  activated_at date [pk, not null]
+  deactivated_at date [note: 'NULL = активна; CHECK > activated_at']
+  Note: 'Bridge N:M customers <-> services'
+}
+
+// ===== OFFLINE =====
+Table hw2_customer_features_offline {
+  customer_id bigint [pk, not null]
+  valid_from timestamptz [pk, not null]
+  valid_to timestamptz [note: 'NULL = поточна; CHECK valid_to > valid_from']
+  tenure_months integer [not null, note: 'CHECK >= 0']
+  monthly_charges numeric(8,2) [not null, note: 'CHECK >= 0']
+  total_charges numeric(10,2) [note: 'nullable: у Telco порожнє при tenure=0']
+  contract_type varchar(20) [not null, note: "IN ('Month-to-month','One year','Two year')"]
+  paperless_billing boolean [not null]
+  num_active_services integer [not null]
+  Note: 'OFFLINE. Історія ознак, інтервал [valid_from, valid_to)'
+}
+
+Table hw2_training_events {
+  event_id bigint [pk, increment]
+  customer_id bigint [not null]
+  prediction_ts timestamptz [not null]
+  label_horizon_end timestamptz [not null, note: 'CHECK > prediction_ts']
+  churn_in_horizon boolean [not null, note: 'target; час відтоку в Telco невідомий']
+  Note: 'OFFLINE. Мітки для навчання (контрольований набір)'
+}
+
+// ===== ONLINE =====
+Table hw2_customer_features_online {
+  customer_id bigint [pk]
+  tenure_months integer [not null]
+  monthly_charges numeric(8,2) [not null]
+  total_charges numeric(10,2)
+  contract_type varchar(20) [not null]
+  paperless_billing boolean [not null]
+  num_active_services integer [not null]
+  feature_ts timestamptz [not null]
+  updated_at timestamptz [not null]
+  Note: 'ONLINE. Денормалізований рядок, 1 на клієнта'
+}
+
+// ===== ЗВ'ЯЗКИ =====
+Ref: hw2_customer_services.customer_id > hw2_customers.customer_id
+Ref: hw2_customer_services.service_id > hw2_services.service_id
+Ref: hw2_customer_features_offline.customer_id > hw2_customers.customer_id
+Ref: hw2_training_events.customer_id > hw2_customers.customer_id
+Ref: hw2_customer_features_online.customer_id - hw2_customers.customer_id
